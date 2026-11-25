@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+# 保存した検出結果
+*_result*.png
+*_binary*.png

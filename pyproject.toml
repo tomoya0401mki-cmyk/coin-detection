@@ -1,0 +1,10 @@
+[project]
+name = "coin-detection"
+version = "0.1.0"
+description = "Japanese coin detection and counting with OpenCV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "opencv-python",
+]
