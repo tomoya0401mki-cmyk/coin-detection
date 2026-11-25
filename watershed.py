@@ -4,7 +4,7 @@
   - 写真(画像ファイル)から硬貨を認識できるようにした (--image)
     ・日本語を含むパスの画像も読み込める
     ・大きな写真は処理しやすい大きさに縮小して処理する (PROCESS_MAX_WIDTH)
-    ・sキーで、検出結果と二値画像をファイルに保存できる（発表資料用）
+    ・sキーで、検出結果の画像をファイルに保存できる（発表資料用）
   - カメラ・録画動画の入力は今までどおり使える
 
 これまでの変更点:
@@ -22,7 +22,7 @@
     o : 大津法 (Otsu) に切り替え
     a : 適応的二値化 (Adaptive) に切り替え
     b : 背景が明るい／暗い の設定を切り替え（硬貨が白くならないとき）
-    s : 検出結果と二値画像を保存（写真モードでは写真と同じフォルダに保存）
+    s : 検出結果の画像を保存（写真モードでは写真と同じフォルダに保存）
     q : 終了
 
 表示される青字: HSV値・色判定(COPPER/GOLD/SILVER?)・穴判定
@@ -171,15 +171,12 @@ def open_default_camera():
     return None
 
 
-def save_outputs(out_dir, stem, method, bg_bright, result_img, binary):
-    """検出結果と二値画像を、わかりやすい名前で保存する"""
+def save_outputs(out_dir, stem, method, bg_bright, result_img):
+    """検出結果の画像を、わかりやすい名前で保存する"""
     bg = "bright" if bg_bright else "dark"
     result_path = out_dir / f"{stem}_{method}_{bg}_result.png"
-    binary_path = out_dir / f"{stem}_{method}_{bg}_binary.png"
     save_image(result_path, result_img)
-    save_image(binary_path, binary)
     print(f"保存しました: {result_path}")
-    print(f"保存しました: {binary_path}")
 
 
 # =====================================================================
@@ -903,7 +900,6 @@ def main():
                 method,
                 bg_bright,
                 result_img,
-                binary,
             )
 
         # FPS計算
