@@ -28,9 +28,9 @@
 表示される青字: HSV値・色判定(COPPER/GOLD/SILVER?)・穴判定
 
 実行例:
-    uv run python coin_detection.py                       # Webカメラ
-    uv run python coin_detection.py --video a.mp4         # 録画動画
-    uv run python coin_detection.py --image coins.jpg     # 写真
+    uv run python watershed.py                       # Webカメラ（外部カメラ優先、なければ内蔵カメラ）
+    uv run python watershed.py --video a.mp4         # 録画動画
+    uv run python watershed.py --image coins.jpg     # 写真
 """
 
 import argparse
@@ -45,7 +45,9 @@ import numpy as np
 # =====================================================================
 # 設定部分（閾値や判定条件はここにまとめる。環境に合わせて調整する）
 # =====================================================================
-CAMERA_INDEX = 1                 # Webカメラの番号（映らないときは1に変更）
+# カメラは自動で選ぶ: 外部カメラがつながっていれば外部カメラ、なければ内蔵カメラ
+EXTERNAL_CAMERA_INDEX = 1        # 外部(USB)カメラの番号
+BUILTIN_CAMERA_INDEX = 0         # 内蔵カメラの番号
 BLUR_KSIZE = (5, 5)              # ノイズ除去(ガウシアンぼかし)のサイズ（奇数）
 
 # 写真を読み込んだときの、処理用の最大の幅[px]。これより大きい写真は縮小する。
@@ -142,6 +144,31 @@ def save_image(path, image):
     if ok:
         buf.tofile(str(path))
     return ok
+
+
+def open_camera(index):
+    """指定番号のカメラを開く。開けない・映らないときは None を返す"""
+    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+    if cap.isOpened():
+        ok, _ = cap.read()
+        if ok:
+            return cap
+    cap.release()
+    return None
+
+
+def open_default_camera():
+    """外部カメラがつながっていれば外部カメラ、なければ内蔵カメラを開く。
+
+    戻り値: 開いたカメラ。どちらも開けなければ None
+    """
+    for index, name in ((EXTERNAL_CAMERA_INDEX, "外部カメラ"),
+                        (BUILTIN_CAMERA_INDEX, "内蔵カメラ")):
+        cap = open_camera(index)
+        if cap is not None:
+            print(f"{name}（カメラ番号 {index}）で開きます")
+            return cap
+    return None
 
 
 def save_outputs(out_dir, stem, method, bg_bright, result_img, binary):
@@ -776,15 +803,19 @@ def main():
         # 動画またはWebカメラモード
         if args.video:
             cap = cv2.VideoCapture(args.video)
+
+            if not cap.isOpened():
+                print(f"動画を開けませんでした: {args.video}")
+                print("ファイルパスを確認してください。")
+                cap.release()
+                return
         else:
-            cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_DSHOW)
+            cap = open_default_camera()
 
-        if not cap.isOpened():
-            print("映像を開けませんでした。")
-            print("カメラ番号やファイルパスを確認してください。")
-
-            cap.release()
-            return
+            if cap is None:
+                print("カメラを開けませんでした。")
+                print("カメラが接続されているか、他のアプリで使用中でないか確認してください。")
+                return
 
         out_dir = Path.cwd()
         stem = "capture"

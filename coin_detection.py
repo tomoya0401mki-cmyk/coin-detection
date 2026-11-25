@@ -22,15 +22,13 @@
     o : 大津法 (Otsu) に切り替え
     a : 適応的二値化 (Adaptive) に切り替え
     b : 背景が明るい／暗い の設定を切り替え（硬貨が白くならないとき）
-    c : カメラを次の番号に切り替え（外付けが映らないとき。Webカメラ入力のときだけ）
     s : 検出結果と二値画像を保存（写真モードでは写真と同じフォルダに保存）
     q : 終了
 
 表示される青字: HSV値・色判定(COPPER/GOLD/SILVER?)・穴判定
 
 実行例:
-    uv run python coin_detection.py                       # 既定のカメラ番号（CAMERA_INDEX）
-    uv run python coin_detection.py --camera 1            # カメラ番号を指定
+    uv run python coin_detection.py                       # Webカメラ（外部カメラ優先、なければ内蔵カメラ）
     uv run python coin_detection.py --video a.mp4         # 録画動画
     uv run python coin_detection.py --image coins.jpg     # 写真
 """
@@ -47,8 +45,9 @@ import numpy as np
 # =====================================================================
 # 設定部分（閾値や判定条件はここにまとめる。環境に合わせて調整する）
 # =====================================================================
-CAMERA_INDEX = 1                 # 外付けカメラの番号（内蔵が0のPCが多い）。映らなければ cキーで切り替え
-CAMERA_MAX_INDEX = 5             # cキーで探すカメラ番号の範囲（0〜この数-1）
+# カメラは自動で選ぶ: 外部カメラがつながっていれば外部カメラ、なければ内蔵カメラ
+EXTERNAL_CAMERA_INDEX = 1        # 外部(USB)カメラの番号
+BUILTIN_CAMERA_INDEX = 0         # 内蔵カメラの番号
 BLUR_KSIZE = (5, 5)              # ノイズ除去(ガウシアンぼかし)のサイズ（奇数）
 
 # 写真を読み込んだときの、処理用の最大の幅[px]。これより大きい写真は縮小する。
@@ -141,7 +140,7 @@ def save_image(path, image):
 
 
 def open_camera(index):
-    """指定番号のカメラを開く。開けなければ None を返す"""
+    """指定番号のカメラを開く。開けない・映らないときは None を返す"""
     cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
     if cap.isOpened():
         ok, _ = cap.read()
@@ -151,14 +150,18 @@ def open_camera(index):
     return None
 
 
-def switch_camera(current_index):
-    """次に映るカメラを探して (cap, 番号) を返す。見つからなければ (None, current_index)"""
-    for step in range(1, CAMERA_MAX_INDEX):
-        index = (current_index + step) % CAMERA_MAX_INDEX
+def open_default_camera():
+    """外部カメラがつながっていれば外部カメラ、なければ内蔵カメラを開く。
+
+    戻り値: 開いたカメラ。どちらも開けなければ None
+    """
+    for index, name in ((EXTERNAL_CAMERA_INDEX, "外部カメラ"),
+                        (BUILTIN_CAMERA_INDEX, "内蔵カメラ")):
         cap = open_camera(index)
         if cap is not None:
-            return cap, index
-    return None, current_index
+            print(f"{name}（カメラ番号 {index}）で開きます")
+            return cap
+    return None
 
 
 def save_outputs(out_dir, stem, method, bg_bright, result_img, binary):
@@ -634,12 +637,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", help="写真(画像ファイル)のパス")
     parser.add_argument("--video", help="録画動画のパス（省略時はWebカメラ）")
-    parser.add_argument(
-        "--camera",
-        type=int,
-        default=CAMERA_INDEX,
-        help=f"Webカメラの番号（既定値: {CAMERA_INDEX}）",
-    )
     args = parser.parse_args()
 
     # 入力の準備
@@ -662,23 +659,22 @@ def main():
         # 動画またはWebカメラモード
         if args.video:
             cap = cv2.VideoCapture(args.video)
+
+            if not cap.isOpened():
+                print(f"動画を開けませんでした: {args.video}")
+                print("ファイルパスを確認してください。")
+                cap.release()
+                return
         else:
-            cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
-            print(f"カメラ番号 {args.camera} で開きます（cキーで次のカメラに切り替え）")
+            cap = open_default_camera()
 
-        if not cap.isOpened():
-            print(f"映像を開けませんでした（カメラ番号: {args.camera}）。")
-            print("カメラ番号やファイルパスを確認してください。")
-
-            cap.release()
-            return
+            if cap is None:
+                print("カメラを開けませんでした。")
+                print("カメラが接続されているか、他のアプリで使用中でないか確認してください。")
+                return
 
         out_dir = Path.cwd()
         stem = "capture"
-
-    # Webカメラ入力のときだけ、cキーでカメラを切り替えられる
-    use_camera = still is None and not args.video
-    camera_index = args.camera
 
     # 初期設定
     method = "otsu"
@@ -755,16 +751,6 @@ def main():
 
         elif key == ord("b"):
             bg_bright = not bg_bright
-
-        elif key == ord("c") and use_camera:
-            new_cap, new_index = switch_camera(camera_index)
-            if new_cap is None:
-                print("切り替えられるカメラが見つかりませんでした。")
-            else:
-                cap.release()
-                cap = new_cap
-                camera_index = new_index
-                print(f"カメラ番号 {camera_index} に切り替えました")
 
         elif key == ord("s"):
             save_outputs(

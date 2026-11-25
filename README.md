@@ -44,8 +44,7 @@ Webカメラの映像・録画動画・写真から日本の硬貨（1円・5円
 
 ```bash
 uv sync
-uv run python coin_detection.py                    # Webカメラ（既定のカメラ番号）
-uv run python coin_detection.py --camera 0         # カメラ番号を指定
+uv run python coin_detection.py                    # Webカメラ（外部カメラ優先、なければ内蔵カメラ）
 uv run python coin_detection.py --video a.mp4      # 録画動画
 uv run python coin_detection.py --image coins.jpg  # 写真
 uv run python watershed.py --image coins.jpg       # くっついた硬貨を分離する改善版
@@ -65,9 +64,10 @@ python coin_detection.py --image coins.jpg
 | `o` | 大津法に切り替え |
 | `a` | 適応的二値化に切り替え |
 | `b` | 背景が明るい／暗いの設定を切り替え（硬貨が白くならないとき） |
-| `c` | 次のカメラ番号に切り替え（`coin_detection.py` のWebカメラ入力のみ） |
 | `s` | 検出結果と二値画像を保存 |
 | `q` | 終了 |
+
+Webカメラは自動で選ばれます。外部(USB)カメラがつながっていればそちらを、なければ内蔵カメラを使います。
 
 閾値や判定条件は、各ファイル冒頭の「設定部分」にまとめてあります。撮影環境に合わせて調整してください。
 
